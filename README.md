@@ -6,8 +6,11 @@
 Modelo conceptual de base de datos para una red social estudiantil.
 
 ## Integrantes
+- Juan Sebastian Rojas Ramirez
+- Kelly Sofia Gil Serna
 - Luis Mateo Cataño Rivera
-
+- Shaira Nicoll Fajardo Ortega
+  
 ## Descripción del caso
 
 El proyecto consiste en diseñar el modelo conceptual de una base de datos para una red social estudiantil.
