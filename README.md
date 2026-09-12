@@ -6,8 +6,7 @@
 Modelo conceptual de base de datos para una red social estudiantil.
 
 ## Integrantes
-
-- ¡¡¡¡PENDIENTE!!!!
+- Luis Mateo Cataño Rivera
 
 ## Descripción del caso
 
