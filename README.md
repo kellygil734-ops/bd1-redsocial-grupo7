@@ -19,11 +19,12 @@ La plataforma busca facilitar la comunicación y la interacción entre estudiant
 
 ## Objetivo
 
-Diseñar un Modelo Entidad-Relación que permita representar las principales entidades, atributos, relaciones y cardinalidades necesarias para el funcionamiento de la plataforma.
+Diseñar un Modelo Entidad-Relación que permita representar las principales entidades, atributos, relaciones y cardinalidades necesarias para el funcionamiento de la plataforma. En esta actividad utilizaremos la informacion y avance de la actividad pasada para la realizacion del diccionario de datos que incluye diversas claves (primaria, foranea, unica).
 
 ## Entidades principales
 
 - ESTUDIANTE
+- INTERESES
 - PUBLICACIÓN
 - COMENTARIO
 - GRUPO
@@ -31,7 +32,7 @@ Diseñar un Modelo Entidad-Relación que permita representar las principales ent
 - EVENTO
 - ASISTENCIA_EVENTO
 - MENSAJE
-
+entre otras.
 ## Relaciones principales
 
 - ESTUDIANTE CREA PUBLICACIÓN.
