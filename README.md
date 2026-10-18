@@ -3,7 +3,7 @@
 
 ## Nombre del proyecto
 
-Modelo conceptual de base de datos para una red social estudiantil.
+Modelo fisico de base de datos para una red social estudiantil.
 
 ## Integrantes
 - Juan Sebastian Rojas Ramirez
@@ -13,13 +13,13 @@ Modelo conceptual de base de datos para una red social estudiantil.
   
 ## Descripción del caso
 
-El proyecto consiste en diseñar el modelo conceptual de una base de datos para una red social estudiantil.
+El proyecto consiste en diseñar el modelo fisico de una base de datos para una red social estudiantil.
 
 La plataforma busca facilitar la comunicación y la interacción entre estudiantes mediante perfiles, publicaciones, comentarios, conexiones, grupos, eventos y mensajes.
 
 ## Objetivo
 
-Diseñar un Modelo Entidad-Relación que permita representar las principales entidades, atributos, relaciones y cardinalidades necesarias para el funcionamiento de la plataforma. En esta actividad utilizaremos la informacion y avance de la actividad pasada para la realizacion del diccionario de datos que incluye diversas claves (primaria, foranea, unica).
+Diseñar un Modelo fisico en MySQL donde implementemos todo lo aprendido en el modelo conceptual que realizamos anteriormente
 
 ## Entidades principales
 
