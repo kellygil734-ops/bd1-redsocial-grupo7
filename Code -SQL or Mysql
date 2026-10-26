@@ -170,3 +170,284 @@ CREATE TABLE reporte_contenido (
 ) ENGINE=InnoDB;
 SHOW TABLES;
 SELECT ubicacion->>'$.lugar' AS lugar FROM publicacion WHERE ubicacion IS NOT NULL;
+
+
+___________________________________________________________________________________________________________________________
+
+Mismo codigo pero en mongodbcompass
+
+use("SIc")
+switched to db SIc
+db["l"].find()// =============================================================================
+// SCRIPT DE CONVERSIÓN A MONGODB (NOSQL) CON VALIDACIÓN DE ESQUEMA ($jsonSchema)
+// =============================================================================
+
+db = db.getSiblingDB("universidad_db");
+
+// -----------------------------------------------------------------------------
+// 1. COLECCIÓN: estudiantes
+// Unifica la tabla 'estudiante', 'preferencias' (JSON) y 'estudiante_interes'
+// -----------------------------------------------------------------------------
+db.createCollection("estudiantes", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["nombre", "apellido", "correo", "carrera", "semestre"],
+      properties: {
+        nombre: { bsonType: "string" },
+        apellido: { bsonType: "string" },
+        correo: { bsonType: "string", pattern: "^.+@.+$" },
+        carrera: { bsonType: "string" },
+        
+        semestre: { bsonType: "int", minimum: 1, maximum: 12 },
+        fecha_registro: { bsonType: "date" },
+        
+        preferencias: { bsonType: "object" },
+        
+        intereses_ids: { bsonType: "array", items: { bsonType: "objectId" } }
+      }
+    }
+  }
+});
+
+db.estudiantes.createIndex({ correo: 1 }, { unique: true });
+
+
+// -----------------------------------------------------------------------------
+// 2. COLECCIÓN: tipos_evento
+// -----------------------------------------------------------------------------
+db.createCollection("tipos_evento", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["nombre"],
+      properties: {
+        nombre: { bsonType: "string" },
+        descripcion: { bsonType: "string" }
+      }
+    }
+  }
+});
+
+db.tipos_evento.createIndex({ nombre: 1 }, { unique: true });
+
+
+// -----------------------------------------------------------------------------
+// 3. COLECCIÓN: intereses
+// -----------------------------------------------------------------------------
+db.createCollection("intereses", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["nombre"],
+      properties: {
+        nombre: { bsonType: "string" }
+      }
+    }
+  }
+});
+
+db.intereses.createIndex({ nombre: 1 }, { unique: true });
+
+
+// -----------------------------------------------------------------------------
+// 4. COLECCIÓN: grupos
+// -----------------------------------------------------------------------------
+db.createCollection("grupos", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["nombre"],
+      properties: {
+        nombre: { bsonType: "string" },
+        descripcion: { bsonType: "string" },
+        fecha_creacion: { bsonType: "date" },
+        
+        miembros: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["estudiante_id", "rol"],
+            properties: {
+              estudiante_id: { bsonType: "objectId" },
+              fecha_ingreso: { bsonType: "date" },
+              rol: { bsonType: "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+
+// -----------------------------------------------------------------------------
+// 5. COLECCIÓN: eventos
+// -----------------------------------------------------------------------------
+db.createCollection("eventos", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["tipo_evento_id", "nombre", "fecha", "lugar"],
+      properties: {
+        tipo_evento_id: { bsonType: "objectId" },
+        nombre: { bsonType: "string" },
+        descripcion: { bsonType: "string" },
+        fecha: { bsonType: "date" },
+        lugar: { bsonType: "string" }
+      }
+    }
+  }
+});
+
+
+// -----------------------------------------------------------------------------
+// 6. COLECCIÓN: publicaciones
+// -----------------------------------------------------------------------------
+db.createCollection("publicaciones", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["estudiante_id", "contenido"],
+      properties: {
+        estudiante_id: { bsonType: "objectId" },
+        contenido: { bsonType: "string" },
+        fecha_publicacion: { bsonType: "date" },
+        
+        ubicacion: { bsonType: "object" },
+        
+        comentarios: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["estudiante_id", "contenido"],
+            properties: {
+              comentario_id: { bsonType: "objectId" },
+              estudiante_id: { bsonType: "objectId" },
+              contenido: { bsonType: "string" },
+              fecha_comentario: { bsonType: "date" }
+            }
+          }
+        },
+        
+        reacciones: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["estudiante_id", "tipo"],
+            properties: {
+              estudiante_id: { bsonType: "objectId" },
+              tipo: { enum: ["me_gusta", "me_encanta", "me_divierte", "me_entristece"] },
+              fecha: { bsonType: "date" }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+db.publicaciones.createIndex({ fecha_publicacion: -1 });
+
+
+// -----------------------------------------------------------------------------
+// 7. COLECCIÓN: archivos_compartidos
+// -----------------------------------------------------------------------------
+db.createCollection("archivos_compartidos", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["grupo_id", "estudiante_id", "nombre_archivo"],
+      properties: {
+        grupo_id: { bsonType: "objectId" },
+        estudiante_id: { bsonType: "objectId" },
+        nombre_archivo: { bsonType: "string" },
+        tipo_archivo: { bsonType: "string" },
+        fecha_subida: { bsonType: "date" }
+      }
+    }
+  }
+});
+
+
+// -----------------------------------------------------------------------------
+// 8. COLECCIÓN: notificaciones
+// -----------------------------------------------------------------------------
+db.createCollection("notificaciones", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["estudiante_id", "tipo", "mensaje"],
+      properties: {
+        estudiante_id: { bsonType: "objectId" },
+        tipo: { bsonType: "string" },
+        mensaje: { bsonType: "string" },
+        fecha: { bsonType: "date" },
+        leida: { bsonType: "bool" }
+      }
+    }
+  }
+});
+
+
+// -----------------------------------------------------------------------------
+// 9. COLECCIÓN: asistencias_eventos (IoT)
+// -----------------------------------------------------------------------------
+db.createCollection("asistencias_eventos", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["estudiante_id", "evento_id", "estado"],
+      properties: {
+        estudiante_id: { bsonType: "objectId" },
+        evento_id: { bsonType: "objectId" },
+        fecha_registro: { bsonType: "date" },
+        estado: { enum: ["inscrito", "asistio", "ausente", "cancelado"] },
+        
+        lectura_sensor: { bsonType: "object" }
+      }
+    }
+  }
+});
+
+db.asistencias_eventos.createIndex({ estudiante_id: 1, evento_id: 1 }, { unique: true });
+
+
+// -----------------------------------------------------------------------------
+// 10. COLECCIÓN: mensajes
+// -----------------------------------------------------------------------------
+db.createCollection("mensajes", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["remitente_id", "destinatario_id", "contenido"],
+      properties: {
+        remitente_id: { bsonType: "objectId" },
+        destinatario_id: { bsonType: "objectId" },
+        contenido: { bsonType: "string" },
+        fecha_envio: { bsonType: "date" }
+      }
+    }
+  }
+});
+
+
+// -----------------------------------------------------------------------------
+// 11. COLECCIÓN: reportes_contenido
+// -----------------------------------------------------------------------------
+db.createCollection("reportes_contenido", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["estudiante_id", "tipo_contenido", "contenido_id", "motivo"],
+      properties: {
+        estudiante_id: { bsonType: "objectId" },
+        tipo_contenido: { enum: ["publicacion", "comentario", "mensaje", "archivo"] },
+        contenido_id: { bsonType: "objectId" },
+        motivo: { bsonType: "string" },
+        fecha_reporte: { bsonType: "date" },
+        estado: { enum: ["pendiente", "en_revision", "resuelto", "descartado"] }
+      }
+    }
+  }
+});
