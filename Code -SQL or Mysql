@@ -1,0 +1,172 @@
+Mysql - Comparar la implementación de un diccionario de datos físico en diferentes SGBD. Valor 10%
+
+CREATE TABLE estudiante (
+  id_estudiante  INT          NOT NULL AUTO_INCREMENT,
+  nombre         VARCHAR(80)  NOT NULL,
+  apellido       VARCHAR(80)  NOT NULL,
+  correo         VARCHAR(150) NOT NULL,
+  carrera        VARCHAR(100) NOT NULL,
+  semestre       INT          NOT NULL,
+  fecha_registro DATE         NOT NULL DEFAULT (CURRENT_DATE),
+  preferencias   JSON         NULL,                       -- JSON NUEVO
+  CONSTRAINT pk_estudiante PRIMARY KEY (id_estudiante),
+  CONSTRAINT uq_estudiante_correo UNIQUE (correo),
+  CONSTRAINT ck_estudiante_semestre CHECK (semestre BETWEEN 1 AND 12)
+) ENGINE=InnoDB;
+CREATE TABLE tipo_evento (
+  id_tipo_evento INT          NOT NULL AUTO_INCREMENT,
+  nombre         VARCHAR(100) NOT NULL,
+  descripcion    TEXT         NULL,
+  CONSTRAINT pk_tipo_evento PRIMARY KEY (id_tipo_evento),
+  CONSTRAINT uq_tipo_evento_nombre UNIQUE (nombre)
+) ENGINE=InnoDB;
+CREATE TABLE interes (
+  id_interes INT          NOT NULL AUTO_INCREMENT,
+  nombre     VARCHAR(100) NOT NULL,
+  CONSTRAINT pk_interes PRIMARY KEY (id_interes),
+  CONSTRAINT uq_interes_nombre UNIQUE (nombre)
+) ENGINE=InnoDB;
+CREATE TABLE grupo (
+  id_grupo       INT          NOT NULL AUTO_INCREMENT,
+  nombre         VARCHAR(100) NOT NULL,
+  descripcion    TEXT         NULL,
+  fecha_creacion DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pk_grupo PRIMARY KEY (id_grupo)
+) ENGINE=InnoDB;
+CREATE TABLE evento (
+  id_evento      INT          NOT NULL AUTO_INCREMENT,
+  id_tipo_evento INT          NOT NULL,
+  nombre         VARCHAR(150) NOT NULL,
+  descripcion    TEXT         NULL,
+  fecha          DATETIME     NOT NULL,
+  lugar          VARCHAR(200) NOT NULL,
+  CONSTRAINT pk_evento PRIMARY KEY (id_evento),
+  CONSTRAINT fk_evento_tipo FOREIGN KEY (id_tipo_evento) REFERENCES tipo_evento (id_tipo_evento)
+) ENGINE=InnoDB;
+CREATE TABLE publicacion (
+  id_publicacion    INT      NOT NULL AUTO_INCREMENT,
+  id_estudiante     INT      NOT NULL,
+  contenido         TEXT     NOT NULL,
+  fecha_publicacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ubicacion         JSON     NULL,                        -- JSON NUEVO
+  CONSTRAINT pk_publicacion PRIMARY KEY (id_publicacion),
+  CONSTRAINT fk_publicacion_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante),
+  INDEX idx_publicacion_fecha (fecha_publicacion)
+) ENGINE=InnoDB;
+CREATE TABLE comentario (
+  id_comentario    INT      NOT NULL AUTO_INCREMENT,
+  id_estudiante    INT      NOT NULL,
+  id_publicacion   INT      NOT NULL,
+  contenido        TEXT     NOT NULL,
+  fecha_comentario DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pk_comentario PRIMARY KEY (id_comentario),
+  CONSTRAINT fk_comentario_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante),
+  CONSTRAINT fk_comentario_publicacion FOREIGN KEY (id_publicacion)
+    REFERENCES publicacion (id_publicacion) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE reaccion (
+  id_reaccion    INT         NOT NULL AUTO_INCREMENT,
+  id_estudiante  INT         NOT NULL,
+  id_publicacion INT         NOT NULL,
+  tipo           VARCHAR(30) NOT NULL,
+  fecha          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pk_reaccion PRIMARY KEY (id_reaccion),
+  CONSTRAINT uq_reaccion UNIQUE (id_estudiante, id_publicacion),
+  CONSTRAINT fk_reaccion_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante),
+  CONSTRAINT fk_reaccion_publicacion FOREIGN KEY (id_publicacion)
+    REFERENCES publicacion (id_publicacion) ON DELETE CASCADE,
+  CONSTRAINT ck_reaccion_tipo CHECK (tipo IN ('me_gusta','me_encanta','me_divierte','me_entristece'))
+) ENGINE=InnoDB;
+CREATE TABLE miembro_grupo (
+  id_estudiante INT         NOT NULL,
+  id_grupo      INT         NOT NULL,
+  fecha_ingreso DATE        NOT NULL DEFAULT (CURRENT_DATE),
+  rol           VARCHAR(30) NOT NULL DEFAULT 'miembro',
+  CONSTRAINT pk_miembro_grupo PRIMARY KEY (id_estudiante, id_grupo),
+  CONSTRAINT fk_miembro_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante) ON DELETE CASCADE,
+  CONSTRAINT fk_miembro_grupo FOREIGN KEY (id_grupo)
+    REFERENCES grupo (id_grupo) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE estudiante_interes (
+  id_estudiante INT NOT NULL,
+  id_interes    INT NOT NULL,
+  CONSTRAINT pk_estudiante_interes PRIMARY KEY (id_estudiante, id_interes),
+  CONSTRAINT fk_ei_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante) ON DELETE CASCADE,
+  CONSTRAINT fk_ei_interes FOREIGN KEY (id_interes)
+    REFERENCES interes (id_interes) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE archivo_compartido (
+  id_archivo     INT          NOT NULL AUTO_INCREMENT,
+  id_grupo       INT          NOT NULL,
+  id_estudiante  INT          NOT NULL,
+  nombre_archivo VARCHAR(255) NOT NULL,
+  tipo_archivo   VARCHAR(50)  NULL,
+  fecha_subida   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pk_archivo PRIMARY KEY (id_archivo),
+  CONSTRAINT fk_archivo_grupo FOREIGN KEY (id_grupo)
+    REFERENCES grupo (id_grupo) ON DELETE CASCADE,
+  CONSTRAINT fk_archivo_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante)
+) ENGINE=InnoDB;
+CREATE TABLE notificacion (
+  id_notificacion INT         NOT NULL AUTO_INCREMENT,
+  id_estudiante   INT         NOT NULL,
+  tipo            VARCHAR(50) NOT NULL,
+  mensaje         TEXT        NOT NULL,
+  fecha           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  leida           TINYINT(1)  NOT NULL DEFAULT 0,
+  CONSTRAINT pk_notificacion PRIMARY KEY (id_notificacion),
+  CONSTRAINT fk_notificacion_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante) ON DELETE CASCADE,
+  CONSTRAINT ck_notificacion_leida CHECK (leida IN (0,1))
+) ENGINE=InnoDB;
+CREATE TABLE asistencia_evento (
+  id_asistencia  INT         NOT NULL AUTO_INCREMENT,
+  id_estudiante  INT         NOT NULL,
+  id_evento      INT         NOT NULL,
+  fecha_registro DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  estado         VARCHAR(30) NOT NULL DEFAULT 'inscrito',
+  lectura_sensor JSON        NULL,                        -- JSON NUEVO
+  CONSTRAINT pk_asistencia PRIMARY KEY (id_asistencia),
+  CONSTRAINT uq_asistencia UNIQUE (id_estudiante, id_evento),
+  CONSTRAINT fk_asistencia_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante),
+  CONSTRAINT fk_asistencia_evento FOREIGN KEY (id_evento)
+    REFERENCES evento (id_evento) ON DELETE CASCADE,
+  CONSTRAINT ck_asistencia_estado CHECK (estado IN ('inscrito','asistio','ausente','cancelado'))
+) ENGINE=InnoDB;
+ 
+CREATE TABLE mensaje (
+  id_mensaje      INT      NOT NULL AUTO_INCREMENT,
+  id_remitente    INT      NOT NULL,
+  id_destinatario INT      NOT NULL,
+  contenido       TEXT     NOT NULL,
+  fecha_envio     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT pk_mensaje PRIMARY KEY (id_mensaje),
+  CONSTRAINT fk_mensaje_remitente FOREIGN KEY (id_remitente)
+    REFERENCES estudiante (id_estudiante),
+  CONSTRAINT fk_mensaje_destinatario FOREIGN KEY (id_destinatario)
+    REFERENCES estudiante (id_estudiante),
+  CONSTRAINT ck_mensaje_distintos CHECK (id_remitente <> id_destinatario)
+) ENGINE=InnoDB;
+CREATE TABLE reporte_contenido (
+  id_reporte     INT         NOT NULL AUTO_INCREMENT,
+  id_estudiante  INT         NOT NULL,
+  tipo_contenido VARCHAR(50) NOT NULL,
+  id_contenido   INT         NOT NULL,
+  motivo         TEXT        NOT NULL,
+  fecha_reporte  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  estado         VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+  CONSTRAINT pk_reporte PRIMARY KEY (id_reporte),
+  CONSTRAINT fk_reporte_estudiante FOREIGN KEY (id_estudiante)
+    REFERENCES estudiante (id_estudiante),
+  CONSTRAINT ck_reporte_tipo CHECK (tipo_contenido IN ('publicacion','comentario','mensaje','archivo')),
+  CONSTRAINT ck_reporte_estado CHECK (estado IN ('pendiente','en_revision','resuelto','descartado'))
+) ENGINE=InnoDB;
+SHOW TABLES;
+SELECT ubicacion->>'$.lugar' AS lugar FROM publicacion WHERE ubicacion IS NOT NULL;
