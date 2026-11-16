@@ -1,0 +1,368 @@
+/*
+==============================================================================
+PROYECTO : RED SOCIAL ESTUDIANTIL PASCUALINA (NETSICAU / PARCHEU)
+ARCHIVO  : 01_ddl_postgresql.sql
+SGBD     : PostgreSQL 16 (se ejecuta en pgAdmin 4 -> Query Tool)
+ORIGEN   : Modelo físico de la Tarea 3 (escrito originalmente en MySQL).
+           Aquí se TRADUCE a PostgreSQL SIN cambiar el modelo: mismas 15
+           tablas, mismas columnas, mismas claves y mismas reglas.
+==============================================================================
+
+CÓMO EJECUTARLO
+  1. En pgAdmin: clic derecho en "Databases" > Create > Database...
+     y crear una base llamada  netsicau_parcheu
+  2. Abrir Query Tool sobre esa base, pegar este archivo y ejecutar (F5).
+  3. Es repetible: al inicio elimina las tablas si ya existen.
+
+EQUIVALENCIAS MySQL -> PostgreSQL USADAS EN LA TRADUCCIÓN
+  MySQL                         PostgreSQL
+  ----------------------------  ---------------------------------------------
+  INT AUTO_INCREMENT            INT GENERATED ALWAYS AS IDENTITY
+  DATETIME                      TIMESTAMP
+  TINYINT(1)  (booleano)        BOOLEAN   (la regla leida IN (0,1) la da el tipo)
+  DEFAULT (CURRENT_DATE)        DEFAULT CURRENT_DATE
+  ENGINE=InnoDB                 (no existe; PostgreSQL ya es transaccional)
+  CHARACTER SET utf8mb4         (la codificación UTF8 se define al crear la BD)
+  CREATE DATABASE ... / USE     (se hace desde pgAdmin, ver paso 1)
+  information_schema.table_rows (no existe; se usa pg_stat_user_tables)
+
+CONCEPTOS CLAVE
+  PK (Primary Key)  : campo único que identifica cada fila.
+  FK (Foreign Key)  : campo que vincula una tabla hija con su tabla padre.
+  IDENTITY          : PostgreSQL genera el número consecutivo automáticamente.
+  ON DELETE CASCADE : si se borra el padre, se borran sus hijos.
+  ON DELETE RESTRICT: impide borrar el padre si tiene hijos.
+==============================================================================
+*/
+
+-- ----------------------------------------------------------------------------
+-- 0. LIMPIEZA: elimina las tablas en orden inverso a sus dependencias
+--    (primero las hijas, al final las padres). CASCADE evita errores si queda
+--    alguna dependencia pendiente.
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS asistencia_evento    CASCADE;
+DROP TABLE IF EXISTS evento               CASCADE;
+DROP TABLE IF EXISTS tipo_evento          CASCADE;
+DROP TABLE IF EXISTS reporte_contenido    CASCADE;
+DROP TABLE IF EXISTS notificacion         CASCADE;
+DROP TABLE IF EXISTS comentario           CASCADE;
+DROP TABLE IF EXISTS archivo_compartido   CASCADE;
+DROP TABLE IF EXISTS mensaje              CASCADE;
+DROP TABLE IF EXISTS miembro_grupo        CASCADE;
+DROP TABLE IF EXISTS grupo                CASCADE;
+DROP TABLE IF EXISTS estudiante_interes   CASCADE;
+DROP TABLE IF EXISTS interes              CASCADE;
+DROP TABLE IF EXISTS reaccion             CASCADE;
+DROP TABLE IF EXISTS publicacion          CASCADE;
+DROP TABLE IF EXISTS estudiante           CASCADE;
+
+/* ============================================================================
+1. TABLA: ESTUDIANTE
+============================================================================
+- Propósito : perfil principal de cada usuario de la plataforma.
+- PK        : id_estudiante (INT identity). Clave subrogada: no depende de datos
+              personales como el documento o el correo.
+- Tipos     : nombre/apellido VARCHAR(80); correo VARCHAR(150) único;
+              carrera VARCHAR(100); semestre INT; fecha_registro DATE (solo
+              interesa el día de ingreso).
+============================================================================ */
+CREATE TABLE estudiante (
+    id_estudiante   INT GENERATED ALWAYS AS IDENTITY,
+    nombre          VARCHAR(80)  NOT NULL,
+    apellido        VARCHAR(80)  NOT NULL,
+    correo          VARCHAR(150) NOT NULL,
+    carrera         VARCHAR(100) NOT NULL,
+    semestre        INT          NOT NULL,
+    fecha_registro  DATE         NOT NULL DEFAULT CURRENT_DATE,
+    CONSTRAINT pk_estudiante          PRIMARY KEY (id_estudiante),
+    CONSTRAINT uq_estudiante_correo   UNIQUE (correo),
+    CONSTRAINT ck_estudiante_semestre CHECK (semestre >= 1)
+);
+
+/* ============================================================================
+2. TABLA: PUBLICACION
+============================================================================
+- Propósito : publicaciones (posts) creadas por los estudiantes.
+- FK        : id_estudiante -> estudiante (autor). ON DELETE CASCADE: si se
+              borra al autor se borran sus publicaciones.
+- Tipos     : contenido TEXT (longitud impredecible); fecha_publicacion
+              TIMESTAMP (fecha y hora exacta).
+============================================================================ */
+CREATE TABLE publicacion (
+    id_publicacion     INT GENERATED ALWAYS AS IDENTITY,
+    id_estudiante      INT       NOT NULL,
+    contenido          TEXT      NOT NULL,
+    fecha_publicacion  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_publicacion PRIMARY KEY (id_publicacion),
+    CONSTRAINT fk_publicacion_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+3. TABLA: REACCION
+============================================================================
+- Propósito : reacciones ("Me gusta", "Me encanta"...) a las publicaciones.
+- FK        : id_estudiante -> estudiante ; id_publicacion -> publicacion.
+              Ambas con ON DELETE CASCADE.
+============================================================================ */
+CREATE TABLE reaccion (
+    id_reaccion     INT GENERATED ALWAYS AS IDENTITY,
+    id_estudiante   INT         NOT NULL,
+    id_publicacion  INT         NOT NULL,
+    tipo            VARCHAR(30) NOT NULL,
+    fecha           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_reaccion PRIMARY KEY (id_reaccion),
+    CONSTRAINT fk_reaccion_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_reaccion_publicacion
+        FOREIGN KEY (id_publicacion) REFERENCES publicacion (id_publicacion)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+4. TABLA: INTERES
+============================================================================
+- Propósito : catálogo global de áreas de interés (Música, Programación...).
+- nombre    : UNIQUE para no duplicar temas.
+============================================================================ */
+CREATE TABLE interes (
+    id_interes  INT GENERATED ALWAYS AS IDENTITY,
+    nombre      VARCHAR(100) NOT NULL,
+    CONSTRAINT pk_interes        PRIMARY KEY (id_interes),
+    CONSTRAINT uq_interes_nombre UNIQUE (nombre)
+);
+
+/* ============================================================================
+5. TABLA: ESTUDIANTE_INTERES   (tabla intermedia N:M)
+============================================================================
+- Propósito : resuelve la relación muchos a muchos entre ESTUDIANTE e INTERES.
+- PK compuesta (id_estudiante, id_interes): impide repetir un mismo interés
+  para el mismo estudiante.
+============================================================================ */
+CREATE TABLE estudiante_interes (
+    id_estudiante  INT NOT NULL,
+    id_interes     INT NOT NULL,
+    CONSTRAINT pk_estudiante_interes PRIMARY KEY (id_estudiante, id_interes),
+    CONSTRAINT fk_est_interes_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_est_interes_interes
+        FOREIGN KEY (id_interes) REFERENCES interes (id_interes)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+6. TABLA: GRUPO
+============================================================================
+- Propósito : grupos de estudio, clubes o equipos.
+============================================================================ */
+CREATE TABLE grupo (
+    id_grupo        INT GENERATED ALWAYS AS IDENTITY,
+    nombre          VARCHAR(100) NOT NULL,
+    descripcion     TEXT,
+    fecha_creacion  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_grupo PRIMARY KEY (id_grupo)
+);
+
+/* ============================================================================
+7. TABLA: MIEMBRO_GRUPO   (tabla intermedia N:M)
+============================================================================
+- Propósito : membresía de un estudiante en un grupo, con su rol.
+- PK compuesta (id_estudiante, id_grupo): nadie se une dos veces al mismo grupo.
+- rol       : 'Miembro' por defecto; también 'Administrador'.
+============================================================================ */
+CREATE TABLE miembro_grupo (
+    id_estudiante  INT         NOT NULL,
+    id_grupo       INT         NOT NULL,
+    fecha_ingreso  DATE        NOT NULL DEFAULT CURRENT_DATE,
+    rol            VARCHAR(30) NOT NULL DEFAULT 'Miembro',
+    CONSTRAINT pk_miembro_grupo PRIMARY KEY (id_estudiante, id_grupo),
+    CONSTRAINT fk_miembro_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_miembro_grupo
+        FOREIGN KEY (id_grupo) REFERENCES grupo (id_grupo)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+8. TABLA: MENSAJE
+============================================================================
+- Propósito : mensajería privada uno a uno entre estudiantes.
+- Dos FK hacia la misma tabla padre (estudiante): remitente y destinatario.
+============================================================================ */
+CREATE TABLE mensaje (
+    id_mensaje       INT GENERATED ALWAYS AS IDENTITY,
+    id_remitente     INT       NOT NULL,
+    id_destinatario  INT       NOT NULL,
+    contenido        TEXT      NOT NULL,
+    fecha_envio      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_mensaje PRIMARY KEY (id_mensaje),
+    CONSTRAINT fk_mensaje_remitente
+        FOREIGN KEY (id_remitente) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_mensaje_destinatario
+        FOREIGN KEY (id_destinatario) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+9. TABLA: ARCHIVO_COMPARTIDO
+============================================================================
+- Propósito : metadatos de los archivos subidos dentro de un grupo.
+- FK        : id_grupo -> grupo ; id_estudiante -> estudiante (quien lo subió).
+============================================================================ */
+CREATE TABLE archivo_compartido (
+    id_archivo      INT GENERATED ALWAYS AS IDENTITY,
+    id_grupo        INT          NOT NULL,
+    id_estudiante   INT          NOT NULL,
+    nombre_archivo  VARCHAR(255) NOT NULL,
+    tipo_archivo    VARCHAR(50),
+    fecha_subida    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_archivo_compartido PRIMARY KEY (id_archivo),
+    CONSTRAINT fk_archivo_grupo
+        FOREIGN KEY (id_grupo) REFERENCES grupo (id_grupo)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_archivo_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+10. TABLA: COMENTARIO
+============================================================================
+- Propósito : comentarios asociados a una publicación.
+============================================================================ */
+CREATE TABLE comentario (
+    id_comentario     INT GENERATED ALWAYS AS IDENTITY,
+    id_estudiante     INT       NOT NULL,
+    id_publicacion    INT       NOT NULL,
+    contenido         TEXT      NOT NULL,
+    fecha_comentario  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_comentario PRIMARY KEY (id_comentario),
+    CONSTRAINT fk_comentario_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_comentario_publicacion
+        FOREIGN KEY (id_publicacion) REFERENCES publicacion (id_publicacion)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+11. TABLA: NOTIFICACION
+============================================================================
+- Propósito : avisos del sistema dirigidos a un estudiante.
+- leida     : BOOLEAN (en MySQL era TINYINT(1)); FALSE = no leída.
+============================================================================ */
+CREATE TABLE notificacion (
+    id_notificacion  INT GENERATED ALWAYS AS IDENTITY,
+    id_estudiante    INT         NOT NULL,
+    tipo             VARCHAR(50) NOT NULL,
+    mensaje          TEXT        NOT NULL,
+    fecha            TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    leida            BOOLEAN     NOT NULL DEFAULT FALSE,
+    CONSTRAINT pk_notificacion PRIMARY KEY (id_notificacion),
+    CONSTRAINT fk_notificacion_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+12. TABLA: REPORTE_CONTENIDO
+============================================================================
+- Propósito : moderación; estudiantes reportan contenido inapropiado.
+- Patrón polimórfico: tipo_contenido + id_contenido apuntan a la publicación o
+  comentario reportado. Por eso id_contenido NO lleva FK estática (la
+  validación la hace la aplicación), igual que en la Tarea 3.
+============================================================================ */
+CREATE TABLE reporte_contenido (
+    id_reporte      INT GENERATED ALWAYS AS IDENTITY,
+    id_estudiante   INT         NOT NULL,
+    tipo_contenido  VARCHAR(50) NOT NULL,
+    id_contenido    INT         NOT NULL,
+    motivo          TEXT        NOT NULL,
+    fecha_reporte   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado          VARCHAR(30) NOT NULL DEFAULT 'Pendiente',
+    CONSTRAINT pk_reporte_contenido PRIMARY KEY (id_reporte),
+    CONSTRAINT fk_reporte_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+/* ============================================================================
+13. TABLA: TIPO_EVENTO
+============================================================================
+- Propósito : categorías de eventos (Académico, Cultural, Deportivo...).
+============================================================================ */
+CREATE TABLE tipo_evento (
+    id_tipo_evento  INT GENERATED ALWAYS AS IDENTITY,
+    nombre          VARCHAR(100) NOT NULL,
+    descripcion     TEXT,
+    CONSTRAINT pk_tipo_evento        PRIMARY KEY (id_tipo_evento),
+    CONSTRAINT uq_tipo_evento_nombre UNIQUE (nombre)
+);
+
+/* ============================================================================
+14. TABLA: EVENTO
+============================================================================
+- FK id_tipo_evento -> tipo_evento con ON DELETE RESTRICT: no se puede borrar
+  una categoría que tenga eventos programados. ON UPDATE CASCADE.
+============================================================================ */
+CREATE TABLE evento (
+    id_evento       INT GENERATED ALWAYS AS IDENTITY,
+    id_tipo_evento  INT          NOT NULL,
+    nombre          VARCHAR(150) NOT NULL,
+    descripcion     TEXT,
+    fecha           TIMESTAMP    NOT NULL,
+    lugar           VARCHAR(200) NOT NULL,
+    CONSTRAINT pk_evento PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_tipo
+        FOREIGN KEY (id_tipo_evento) REFERENCES tipo_evento (id_tipo_evento)
+        ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+/* ============================================================================
+15. TABLA: ASISTENCIA_EVENTO
+============================================================================
+- Propósito : inscripción y asistencia de estudiantes a eventos.
+- UNIQUE (id_estudiante, id_evento): nadie se inscribe dos veces al mismo evento.
+- estado    : 'Inscrito' por defecto.
+============================================================================ */
+CREATE TABLE asistencia_evento (
+    id_asistencia   INT GENERATED ALWAYS AS IDENTITY,
+    id_estudiante   INT         NOT NULL,
+    id_evento       INT         NOT NULL,
+    fecha_registro  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado          VARCHAR(30) NOT NULL DEFAULT 'Inscrito',
+    CONSTRAINT pk_asistencia_evento PRIMARY KEY (id_asistencia),
+    CONSTRAINT fk_asistencia_estudiante
+        FOREIGN KEY (id_estudiante) REFERENCES estudiante (id_estudiante)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_asistencia_evento
+        FOREIGN KEY (id_evento) REFERENCES evento (id_evento)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT uq_asistencia_estudiante_evento UNIQUE (id_estudiante, id_evento)
+);
+
+/* ============================================================================
+16. ÍNDICES SECUNDARIOS (aceleran búsquedas por clave foránea o por fecha)
+============================================================================ */
+CREATE INDEX ix_publicacion_estudiante ON publicacion (id_estudiante);
+CREATE INDEX ix_reaccion_publicacion   ON reaccion (id_publicacion);
+CREATE INDEX ix_comentario_publicacion ON comentario (id_publicacion);
+CREATE INDEX ix_mensaje_destinatario   ON mensaje (id_destinatario);
+CREATE INDEX ix_archivo_grupo          ON archivo_compartido (id_grupo);
+CREATE INDEX ix_notificacion_estudiante ON notificacion (id_estudiante);
+CREATE INDEX ix_evento_fecha           ON evento (fecha);
+CREATE INDEX ix_asistencia_evento      ON asistencia_evento (id_evento);
+
+/* ============================================================================
+17. VERIFICACIÓN: lista las tablas creadas (deben ser 15)
+============================================================================ */
+SELECT table_name AS nombre_tabla
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_type = 'BASE TABLE'
+ORDER BY table_name;
